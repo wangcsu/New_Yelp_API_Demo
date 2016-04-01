@@ -29,7 +29,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import retrofit.Call;
+import retrofit.Callback;
 import retrofit.Response;
+import retrofit.Retrofit;
 
 public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, View.OnClickListener {
     private static final String CONSUMER_KEY = "L8jbFjdSQQwyos1vyLmrlg";
@@ -45,7 +47,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     protected Location mCurrentLocation;
     private String mLatitude;
     private String mLongitude;
-
+    private ArrayList<Restaurant> restaurants = new ArrayList<>();
+    ArrayList<Business> businesses;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -78,7 +81,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             getLocation();
         } else {
-            ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.ACCESS_COARSE_LOCATION},
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
                     MY_PERMISSIONS_ACCESS_COARSE_LOCATION);
         }
 
@@ -98,7 +101,35 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     @Override
     public void onClick(View v) {
         Log.i(TAG, "Current Location" + mLatitude + ", " + mLongitude);
-        new MyTask().execute();
+        YelpAPIFactory apiFactory = new YelpAPIFactory(CONSUMER_KEY, CONSUMER_SECRET, TOKEN, TOKEN_SECRET);
+        YelpAPI yelpAPI = apiFactory.createAPI();
+        Map<String, String> params = new HashMap<>();
+        params.put("term", TERM);
+        params.put("limit", "20");
+        CoordinateOptions coordinate = CoordinateOptions.builder().latitude(Double.valueOf(mLatitude)).
+                longitude(Double.valueOf(mLongitude)).build();
+        Callback<SearchResponse> callback = new Callback<SearchResponse>() {
+            @Override
+            public void onResponse(Response<SearchResponse> response, Retrofit retrofit) {
+                SearchResponse searchResponse = response.body();
+                // Update UI text with the Business object.
+                businesses = searchResponse.businesses();
+                for (int i = 0; i < 20; i++) {
+                    restaurants.add(new Restaurant(businesses.get(i).name(), businesses.get(i).rating()));
+                }
+                ListAdapter mAdapter = new MyListAdapter(getApplicationContext(), restaurants);
+                ListView mListView = (ListView) findViewById(R.id.res_name);
+                mListView.setAdapter(mAdapter);
+            }
+            @Override
+            public void onFailure(Throwable t) {
+                // HTTP error happened, do something to handle it.
+            }
+        };
+        Call<SearchResponse> call = yelpAPI.search(coordinate, params);
+        call.enqueue(callback);
+        //new MyTask().execute();
+
     }
 
     @Override
@@ -122,7 +153,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         }
     }
 
-    private class MyTask extends AsyncTask<Void, Void, ArrayList<Restaurant>> {
+    /*private class MyTask extends AsyncTask<Void, Void, ArrayList<Restaurant>> {
         ArrayList<Restaurant> restaurants = new ArrayList<>();
         @Override
         protected ArrayList<Restaurant> doInBackground(Void... args) {
@@ -160,5 +191,5 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             ListView mListView = (ListView) findViewById(R.id.res_name);
             mListView.setAdapter(mAdapter);
         }
-    }
+    }*/
 }
